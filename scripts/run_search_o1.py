@@ -156,20 +156,6 @@ def parse_args():
         help="Maximum number of tokens to generate. If not set, defaults based on the model and dataset."
     )
 
-    # Bing API Configuration
-    parser.add_argument(
-        '--bing_subscription_key',
-        type=str,
-        required=True,
-        help="Bing Search API subscription key."
-    )
-
-    parser.add_argument(
-        '--bing_endpoint',
-        type=str,
-        default="https://api.bing.microsoft.com/v7.0/search",
-        help="Bing Search API endpoint."
-    )
 
     return parser.parse_args()
 

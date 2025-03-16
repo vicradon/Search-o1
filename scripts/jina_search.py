@@ -1,4 +1,6 @@
 import os
+import re
+import sys
 import json
 import requests
 from requests.exceptions import Timeout
@@ -13,7 +15,9 @@ import re
 import string
 from typing import Optional, Tuple
 from nltk.tokenize import sent_tokenize
+from dotenv import load_dotenv
 
+load_dotenv()
 
 # ----------------------- Custom Headers -----------------------
 headers = {
@@ -181,7 +185,7 @@ def fetch_page_content(urls, max_workers=32, use_jina=False, jina_api_key=None, 
     return results
 
 
-def bing_web_search(query, subscription_key, endpoint, market='en-US', language='en', timeout=20):
+def jina_web_search(query, endpoint, api_key, timeout=20):
     """
     Perform a search using the Bing Web Search API with a set timeout.
 
@@ -198,24 +202,38 @@ def bing_web_search(query, subscription_key, endpoint, market='en-US', language=
     Returns:
         dict: JSON response of the search results. Returns None or raises an exception if the request times out.
     """
-    headers = {
-        "Ocp-Apim-Subscription-Key": subscription_key
-    }
+
     params = {
-        "q": query,
-        "mkt": market,
-        "setLang": language,
-        "textDecorations": True,
-        "textFormat": "HTML"
+        "q": query
+    }
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "X-Respond-With": "no-content",
     }
 
     try:
         response = requests.get(endpoint, headers=headers, params=params, timeout=timeout)
-        response.raise_for_status()  # Raise exception if the request failed
-        search_results = response.json()
+        response.raise_for_status() 
+
+        pattern = r"\[\d+\] (.*?): (.*)"
+
+        matches = re.findall(pattern, response.text)
+        results = []
+
+        ptr = 0
+        while ptr < len(matches):
+            group = matches[ptr:ptr+3]
+            json_obj = {}
+            for key,value in group:
+                json_obj[key] = value
+            results.append(json_obj)
+            ptr += 3
+            
+        search_results = json.dumps(results, indent=4)
         return search_results
     except Timeout:
-        print(f"Bing Web Search request timed out ({timeout} seconds) for query: {query}")
+        print(f"Jina Web Search request timed out ({timeout} seconds) for query: {query}")
         return {}  # Or you can choose to raise an exception
     except requests.exceptions.RequestException as e:
         print(f"Error occurred during Bing Web Search request: {e}")
@@ -287,18 +305,20 @@ def extract_relevant_info(search_results):
 if __name__ == "__main__":
     # Example usage
     # Define the query to search
-    query = "Structure of dimethyl fumarate"
+    # query = "Structure of dimethyl fumarate"
+    query = "\"zqxjkvwpfm 2938vndsklwe\" -site:*.com -site:*.org -site:*.net -site:*.edu -site:*.gov"
+
     
-    # Subscription key and endpoint for Bing Search API
-    BING_SUBSCRIPTION_KEY = "YOUR_BING_SUBSCRIPTION_KEY"
-    if not BING_SUBSCRIPTION_KEY:
-        raise ValueError("Please set the BING_SEARCH_V7_SUBSCRIPTION_KEY environment variable.")
-    
-    bing_endpoint = "https://api.bing.microsoft.com/v7.0/search"
+    JINA_API_KEY = os.getenv("JINA_API_KEY")
+    if not JINA_API_KEY:
+        raise ValueError("Please set the JINA_API_KEY environment variable.")
     
     # Perform the search
-    print("Performing Bing Web Search...")
-    search_results = bing_web_search(query, BING_SUBSCRIPTION_KEY, bing_endpoint)
+    print("Performing Jina Web Search...")
+    jina_endpoint = "https://s.jina.ai"
+    search_results = jina_web_search(query, jina_endpoint, JINA_API_KEY)
+    if not search_results:
+        sys.exit()
     
     print("Extracting relevant information from search results...")
     extracted_info = extract_relevant_info(search_results)
